@@ -1,1 +1,0 @@
-"""Payment microservice application package."""

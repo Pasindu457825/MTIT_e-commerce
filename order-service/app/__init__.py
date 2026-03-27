@@ -1,1 +1,0 @@
-"""Order microservice application package."""

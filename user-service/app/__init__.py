@@ -1,1 +1,0 @@
-"""User microservice application package."""
