@@ -12,12 +12,12 @@ Developer quickstart: see `DEVELOPER_SETUP.md` for running all services locally.
                     │   (routing)     │
                     └────────┬────────┘
                              │
-     ┌───────────┬───────────┼───────────┬───────────┬───────────┐
-     ▼           ▼           ▼           ▼           ▼           ▼
-┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐
-│  User   │ │ Product │ │  Order  │ │ Payment │ │  Cart   │ │ Review  │
-│ Service │ │ Service │ │ Service │ │ Service │ │ Service │ │ Service │
-└─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘
+     ┌───────────┬───────────┼───────────┬───────────┬───────────┬───────────┐
+     ▼           ▼           ▼           ▼           ▼           ▼           ▼
+┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌──────────┐
+│  User   │ │ Product │ │  Order  │ │ Payment │ │  Cart   │ │ Review  │ │Notification│
+│ Service │ │ Service │ │ Service │ │ Service │ │ Service │ │ Service │ │  Service  │
+└─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘ └──────────┘
 ```
 
 ### Responsibilities
@@ -31,10 +31,11 @@ Developer quickstart: see `DEVELOPER_SETUP.md` for running all services locally.
 | **payment-service** | Payment intents, provider webhooks, reconciliation (stubs today). |
 | **cart-service** | Session or user carts before checkout. |
 | **review-service** | Product reviews and ratings. |
+| **notification-service** | User notifications for orders, payments, reviews, and general alerts. |
 
-### Domain services (user, product, order, payment, cart, review)
+### Domain services (user, product, order, payment, cart, review, notification)
 
-The six domain microservices share the **same architecture**:
+The seven domain microservices share the **same architecture**:
 
 - **FastAPI** with **async** I/O and **Motor** (async MongoDB driver; `pymongo` types/errors are used where the stack exposes them).
 - **Configuration** from `.env` via `pydantic-settings` (`app/core/config.py`).
@@ -71,6 +72,7 @@ Each domain service follows the same module boundaries:
 | payment-service | 8004 |
 | cart-service | 8005 |
 | review-service | 8006 |
+| notification-service | 8007 |
 
 ### Where to put `.env` files
 
@@ -98,9 +100,9 @@ Each service loads configuration from a **`.env` file in that service’s own di
 
 Start downstream services before the gateway if you use proxy routes. The gateway reads upstream base URLs from its environment.
 
-**Gateway proxy:** `GET|POST|… /api/v1/{service_key}/{downstream_path}` forwards to `{SERVICE_URL}/api/v1/{service_key}/{downstream_path}`. Keys: `users`, `products`, `orders`, `payments`, `cart`, `reviews`. Example: `GET http://localhost:8000/api/v1/users` → user-service `GET http://localhost:8001/api/v1/users`. Until you add routers under each service’s `/api/v1`, proxied paths may return **404**.
+**Gateway proxy:** `GET|POST|… /api/v1/{service_key}/{downstream_path}` forwards to `{SERVICE_URL}/api/v1/{service_key}/{downstream_path}`. Keys: `users`, `products`, `orders`, `payments`, `cart`, `reviews`, `notifications`. Example: `GET http://localhost:8000/api/v1/users` → user-service `GET http://localhost:8001/api/v1/users`. Until you add routers under each service’s `/api/v1`, proxied paths may return **404**.
 
-**api-gateway** is separate from the six domain services: it proxies HTTP to them and uses its own dependencies (see `api-gateway/README.md`); it is **not** on the Motor/Mongo stack used by the domain services.
+**api-gateway** is separate from the seven domain services: it proxies HTTP to them and uses its own dependencies (see `api-gateway/README.md`); it is **not** on the Motor/Mongo stack used by the domain services.
 
 ### What is intentionally out of scope here
 
@@ -118,6 +120,7 @@ order-service/
 payment-service/
 cart-service/
 review-service/
+notification-service/
 README.md   (this file)
 ```
 
