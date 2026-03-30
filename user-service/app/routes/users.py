@@ -49,11 +49,7 @@ async def list_users(
     return await svc.list_users(limit=limit)
 
 
-@router.get(
-    "/{user_id}",
-    response_model=UserResponse,
-    summary="Get user by id",
-)
+
 async def get_user(
     user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
     svc: UserService = Depends(get_user_service),
@@ -83,10 +79,3 @@ async def update_user(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete user",
 )
-async def delete_user(
-    user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
-    svc: UserService = Depends(get_user_service),
-) -> None:
-    """Delete a user by id."""
-    oid = parse_object_id(user_id)
-    await svc.delete_user(oid)
