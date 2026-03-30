@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     payment_service_url: str = "http://127.0.0.1:8004"
     cart_service_url: str = "http://127.0.0.1:8005"
     review_service_url: str = "http://127.0.0.1:8006"
+    notification_service_url: str = "http://127.0.0.1:8007"
 
     @property
     def service_map(self) -> dict[str, str]:
@@ -40,6 +41,7 @@ class Settings(BaseSettings):
             "payments": self.payment_service_url,
             "cart": self.cart_service_url,
             "reviews": self.review_service_url,
+            "notifications": self.notification_service_url,
         }
 
 
