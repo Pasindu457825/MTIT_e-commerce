@@ -68,7 +68,6 @@ class UserService:
             ) from exc
         return user_documents_to_responses(docs)
 
-    async def get_user(self, user_id: ObjectId) -> UserResponse:
         """Fetch one user by `_id` or 404."""
         try:
             doc = await self._col.find_one({"_id": user_id})
