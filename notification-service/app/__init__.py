@@ -1,0 +1,1 @@
+"""Notification microservice application package."""
