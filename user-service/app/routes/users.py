@@ -44,9 +44,17 @@ async def create_user(
 async def list_users(
     svc: UserService = Depends(get_user_service),
     limit: Annotated[int, Query(ge=1, le=500, description="Max users to return")] = 100,
+    search: Annotated[
+        str | None,
+        Query(
+            min_length=1,
+            max_length=100,
+            description="Search by full name, email, phone, or address",
+        ),
+    ] = None,
 ) -> list[UserResponse]:
     """Return users (newest first)."""
-    return await svc.list_users(limit=limit)
+    return await svc.list_users(limit=limit, search=search)
 
 
 @router.get(

@@ -1,9 +1,10 @@
 """
-User domain logic — database access and rules (duplicate email, timestamps).
+User domain logic: database access and rules (duplicate email, timestamps).
 
-Routes stay thin: validate input → call this service → return schemas.
+Routes stay thin: validate input -> call this service -> return schemas.
 """
 
+import re
 from datetime import UTC, datetime
 
 from bson import ObjectId
@@ -13,7 +14,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.utils.serialization import user_document_to_response, user_documents_to_responses
 
 
@@ -24,9 +25,8 @@ class UserService:
         self._col: AsyncIOMotorCollection = db[settings.users_collection]
 
     async def create_user(self, data: UserCreate) -> UserResponse:
-        """Insert a new user; returns 409 if email already exists (index or pre-check)."""
+        """Insert a new user; returns 409 if email already exists."""
         now = datetime.now(UTC)
-        # `UserCreate` validators already normalize email; keep str() for a plain `str` document.
         email_norm = str(data.email).lower()
         doc = {
             "full_name": data.full_name,
@@ -47,7 +47,7 @@ class UserService:
         except PyMongoError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Could not create user — database error.",
+                detail="Could not create user - database error.",
             ) from exc
 
         created = await self._col.find_one({"_id": result.inserted_id})
@@ -58,15 +58,28 @@ class UserService:
             )
         return user_document_to_response(created)
 
-    async def list_users(self, *, limit: int = 100) -> list[UserResponse]:
-        """Return users sorted by creation time (newest first)."""
+    async def list_users(self, *, limit: int = 100, search: str | None = None) -> list[UserResponse]:
+        """Return users sorted by newest first, optionally filtered by keyword."""
+        query: dict = {}
+        if search:
+            keyword = re.escape(search.strip())
+            if keyword:
+                query = {
+                    "$or": [
+                        {"full_name": {"$regex": keyword, "$options": "i"}},
+                        {"email": {"$regex": keyword, "$options": "i"}},
+                        {"phone": {"$regex": keyword, "$options": "i"}},
+                        {"address": {"$regex": keyword, "$options": "i"}},
+                    ]
+                }
+
         try:
-            cursor = self._col.find().sort("created_at", -1).limit(limit)
+            cursor = self._col.find(query).sort("created_at", -1).limit(limit)
             docs = await cursor.to_list(length=limit)
         except PyMongoError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Could not list users — database error.",
+                detail="Could not list users - database error.",
             ) from exc
         return user_documents_to_responses(docs)
 
@@ -77,7 +90,7 @@ class UserService:
         except PyMongoError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Could not load user — database error.",
+                detail="Could not load user - database error.",
             ) from exc
         if not doc:
             raise HTTPException(
@@ -112,7 +125,6 @@ class UserService:
             payload["email"] = str(payload["email"]).lower()
 
         if not payload:
-            # No fields to change — return current document
             return await self.get_user(user_id)
 
         payload["updated_at"] = datetime.now(UTC)
@@ -127,7 +139,7 @@ class UserService:
         except PyMongoError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Could not update user — database error.",
+                detail="Could not update user - database error.",
             ) from exc
 
         if result.matched_count == 0:
@@ -151,7 +163,7 @@ class UserService:
         except PyMongoError as exc:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Could not delete user — database error.",
+                detail="Could not delete user - database error.",
             ) from exc
         if result.deleted_count == 0:
             raise HTTPException(

@@ -40,6 +40,31 @@ class DummyUserService:
             return await self.get_user(None)
         return None
 
+    async def list_users(self, *, limit: int = 100, search: str | None = None):
+        if search and "bob" in search.lower():
+            return [
+                UserResponse(
+                    id="507f1f77bcf86cd799439012",
+                    full_name="Bob",
+                    email="bob@example.com",
+                    phone="0710000000",
+                    address="Kandy",
+                    created_at=_now(),
+                    updated_at=_now(),
+                )
+            ]
+        return [
+            UserResponse(
+                id="507f1f77bcf86cd799439011",
+                full_name="Alice",
+                email="alice@example.com",
+                phone="0771234567",
+                address="Colombo",
+                created_at=_now(),
+                updated_at=_now(),
+            )
+        ]
+
 
 def test_health_endpoint() -> None:
     with TestClient(app) as client:
@@ -102,6 +127,19 @@ def test_not_found_user() -> None:
         with TestClient(app) as client:
             res = client.get("/api/v1/users/507f1f77bcf86cd799439011")
         assert res.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_list_users_with_search() -> None:
+    app.dependency_overrides[get_user_service] = lambda: DummyUserService()
+    try:
+        with TestClient(app) as client:
+            res = client.get("/api/v1/users?search=bob&limit=10")
+        assert res.status_code == 200
+        data = res.json()
+        assert len(data) == 1
+        assert data[0]["email"] == "bob@example.com"
     finally:
         app.dependency_overrides.clear()
 

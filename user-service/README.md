@@ -38,7 +38,7 @@ Docs: `http://localhost:8001/docs`
 | POST | `/api/v1/auth/login` | Login with email/password and return bearer token |
 | GET | `/api/v1/auth/me` | Get current user from bearer token |
 | POST | `/api/v1/users` | Create user (requires `password` in payload) |
-| GET | `/api/v1/users` | List users (`limit`) |
+| GET | `/api/v1/users` | List users (`limit`) with optional `search` |
 | GET | `/api/v1/users/{user_id}` | Get by MongoDB ObjectId |
 | PUT | `/api/v1/users/{user_id}` | Partial update |
 | DELETE | `/api/v1/users/{user_id}` | Delete |
