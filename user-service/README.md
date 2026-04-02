@@ -34,7 +34,7 @@ Docs: `http://localhost:8001/docs`
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check (`{"status":"ok","service":"user-service"}`) |
-| POST | `/api/v1/auth/register` | Register user and return bearer token |
+| POST | `/api/v1/auth/register` | Register user (`role`: `user` or `admin`) and return bearer token |
 | POST | `/api/v1/auth/login` | Login with email/password and return bearer token |
 | GET | `/api/v1/auth/me` | Get current user from bearer token |
 | POST | `/api/v1/users` | Create user (requires `password` in payload) |

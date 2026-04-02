@@ -30,11 +30,15 @@ def user_document_to_response(doc: dict) -> UserResponse:
     else:
         id_str = str(oid)
 
+    role_value = str(doc.get("role", "user"))
+    if role_value == "customer":
+        role_value = "user"
+
     return UserResponse(
         id=id_str,
         full_name=str(doc["full_name"]),
         email=str(doc["email"]),
-        role=str(doc.get("role", "customer")),
+        role=role_value,
         phone=str(doc.get("phone", "") or ""),
         address=str(doc.get("address", "") or ""),
         created_at=_ensure_utc_aware(doc["created_at"]),

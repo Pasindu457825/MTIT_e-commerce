@@ -19,7 +19,7 @@ class DummyUserService:
             id="507f1f77bcf86cd799439011",
             full_name=body.full_name,
             email=body.email,
-            role=UserRole.CUSTOMER,
+            role=UserRole.ADMIN if getattr(body, "role", None) == "admin" else UserRole.USER,
             phone=body.phone,
             address=body.address,
             created_at=_now(),
@@ -31,7 +31,7 @@ class DummyUserService:
             id="507f1f77bcf86cd799439011",
             full_name="Alice",
             email="alice@example.com",
-            role=UserRole.CUSTOMER,
+            role=UserRole.USER,
             phone="0771234567",
             address="Colombo",
             created_at=_now(),
@@ -50,7 +50,7 @@ class DummyUserService:
                     id="507f1f77bcf86cd799439012",
                     full_name="Bob",
                     email="bob@example.com",
-                    role=UserRole.CUSTOMER,
+                    role=UserRole.USER,
                     phone="0710000000",
                     address="Kandy",
                     created_at=_now(),
@@ -62,7 +62,7 @@ class DummyUserService:
                 id="507f1f77bcf86cd799439011",
                 full_name="Alice",
                 email="alice@example.com",
-                role=UserRole.CUSTOMER,
+                role=UserRole.USER,
                 phone="0771234567",
                 address="Colombo",
                 created_at=_now(),
@@ -212,7 +212,41 @@ def test_auth_register_login_and_me() -> None:
         app.dependency_overrides.clear()
 
 
-def test_users_require_admin() -> None:
+def test_users_require_auth() -> None:
     with TestClient(app) as client:
         res = client.get("/api/v1/users")
     assert res.status_code == 401
+
+
+def test_users_forbidden_for_non_admin() -> None:
+    async def _current_user_override():
+        return await DummyUserService().get_user(None)
+
+    app.dependency_overrides[get_current_user] = _current_user_override
+    try:
+        with TestClient(app) as client:
+            res = client.get("/api/v1/users")
+        assert res.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_register_allows_admin_role_selection() -> None:
+    app.dependency_overrides[get_user_service] = lambda: DummyUserService()
+    try:
+        with TestClient(app) as client:
+            register = client.post(
+                "/api/v1/auth/register",
+                json={
+                    "full_name": "Admin User",
+                    "email": "newadmin@example.com",
+                    "password": "StrongPass123",
+                    "role": "admin",
+                    "phone": "",
+                    "address": "",
+                },
+            )
+        assert register.status_code == 201
+        assert register.json()["user"]["role"] == "admin"
+    finally:
+        app.dependency_overrides.clear()

@@ -16,7 +16,12 @@ def _normalize_email(v: str) -> str:
 
 
 class UserRole(StrEnum):
+    USER = "user"
     CUSTOMER = "customer"
+    ADMIN = "admin"
+
+class UserRoleInput(StrEnum):
+    USER = "user"
     ADMIN = "admin"
 
 
@@ -28,6 +33,7 @@ class UserCreate(BaseModel):
     full_name: Annotated[str, Field(min_length=1, max_length=200)]
     email: EmailStr
     password: Annotated[str, Field(min_length=8, max_length=128)]
+    role: UserRoleInput = UserRoleInput.USER
     phone: Annotated[str, Field(default="", max_length=40)]
     address: Annotated[str, Field(default="", max_length=500)]
 
@@ -49,7 +55,7 @@ class UserUpdate(BaseModel):
     password: Annotated[str | None, Field(default=None, min_length=8, max_length=128)] = None
     phone: Annotated[str | None, Field(default=None, max_length=40)] = None
     address: Annotated[str | None, Field(default=None, max_length=500)] = None
-    role: UserRole | None = None
+    role: UserRoleInput | None = None
 
     @field_validator("email", mode="before")
     @classmethod
