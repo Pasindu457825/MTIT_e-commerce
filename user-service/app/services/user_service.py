@@ -1,0 +1,139 @@
+"""
+User domain logic — database access and rules (duplicate email, timestamps).
+
+Routes stay thin: validate input → call this service → return schemas.
+"""
+
+from datetime import UTC, datetime
+
+from bson import ObjectId
+from fastapi import HTTPException, status
+from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
+from pymongo.errors import DuplicateKeyError, PyMongoError
+
+from app.core.config import settings
+from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.utils.serialization import user_document_to_response, user_documents_to_responses
+
+
+class UserService:
+    """CRUD operations for the `users` collection."""
+
+    def __init__(self, db: AsyncIOMotorDatabase) -> None:
+        self._col: AsyncIOMotorCollection = db[settings.users_collection]
+
+    async def create_user(self, data: UserCreate) -> UserResponse:
+        """Insert a new user; returns 409 if email already exists (index or pre-check)."""
+        now = datetime.now(UTC)
+        # `UserCreate` validators already normalize email; keep str() for a plain `str` document.
+        email_norm = str(data.email).lower()
+        doc = {
+            "full_name": data.full_name,
+            "email": email_norm,
+            "phone": data.phone,
+            "address": data.address,
+            "created_at": now,
+            "updated_at": now,
+        }
+        try:
+            result = await self._col.insert_one(doc)
+        except DuplicateKeyError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this email already exists.",
+            ) from None
+        except PyMongoError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not create user — database error.",
+            ) from exc
+
+        created = await self._col.find_one({"_id": result.inserted_id})
+        if not created:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User was created but could not be loaded.",
+            )
+        return user_document_to_response(created)
+
+    async def list_users(self, *, limit: int = 100) -> list[UserResponse]:
+        """Return users sorted by creation time (newest first)."""
+        try:
+            cursor = self._col.find().sort("created_at", -1).limit(limit)
+            docs = await cursor.to_list(length=limit)
+        except PyMongoError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not list users — database error.",
+            ) from exc
+        return user_documents_to_responses(docs)
+
+    async def get_user(self, user_id: ObjectId) -> UserResponse:
+        """Fetch one user by `_id` or 404."""
+        try:
+            doc = await self._col.find_one({"_id": user_id})
+        except PyMongoError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not load user — database error.",
+            ) from exc
+        if not doc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+        return user_document_to_response(doc)
+
+    async def update_user(self, user_id: ObjectId, data: UserUpdate) -> UserResponse:
+        """Apply partial updates; bumps `updated_at` to UTC now."""
+        payload = data.model_dump(exclude_unset=True, exclude_none=True)
+        if "email" in payload and payload["email"] is not None:
+            payload["email"] = str(payload["email"]).lower()
+
+        if not payload:
+            # No fields to change — return current document
+            return await self.get_user(user_id)
+
+        payload["updated_at"] = datetime.now(UTC)
+
+        try:
+            result = await self._col.update_one({"_id": user_id}, {"$set": payload})
+        except DuplicateKeyError:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A user with this email already exists.",
+            ) from None
+        except PyMongoError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not update user — database error.",
+            ) from exc
+
+        if result.matched_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
+
+        updated = await self._col.find_one({"_id": user_id})
+        if not updated:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="User was updated but could not be loaded.",
+            )
+        return user_document_to_response(updated)
+
+    async def delete_user(self, user_id: ObjectId) -> None:
+        """Delete a user by id; 404 if not found."""
+        try:
+            result = await self._col.delete_one({"_id": user_id})
+        except PyMongoError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not delete user — database error.",
+            ) from exc
+        if result.deleted_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found.",
+            )
