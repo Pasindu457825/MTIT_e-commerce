@@ -2,10 +2,11 @@
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.database import get_database
 from app.core.security import decode_access_token
-from app.routes.users import get_user_service
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse, UserRole
 from app.services.user_service import UserService
 from app.utils.objectid import parse_object_id
 
@@ -14,9 +15,10 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-    svc: UserService = Depends(get_user_service),
+    db: AsyncIOMotorDatabase = Depends(get_database),
 ) -> UserResponse:
     """Resolve authenticated user from bearer token."""
+    svc = UserService(db)
     if credentials is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -47,3 +49,12 @@ async def get_current_user(
                 detail="Token user no longer exists.",
             ) from None
         raise
+
+
+async def require_admin(current_user: UserResponse = Depends(get_current_user)) -> UserResponse:
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges are required for this operation.",
+        )
+    return current_user

@@ -14,7 +14,7 @@ from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from app.core.config import settings
 from app.core.security import hash_password, verify_password
-from app.schemas.user import UserCreate, UserResponse, UserUpdate
+from app.schemas.user import UserCreate, UserResponse, UserRole, UserUpdate
 from app.utils.serialization import user_document_to_response, user_documents_to_responses
 
 
@@ -32,6 +32,7 @@ class UserService:
             "full_name": data.full_name,
             "email": email_norm,
             "password_hash": hash_password(data.password),
+            "role": UserRole.CUSTOMER.value,
             "phone": data.phone,
             "address": data.address,
             "created_at": now,
@@ -123,6 +124,10 @@ class UserService:
         payload = data.model_dump(exclude_unset=True, exclude_none=True)
         if "email" in payload and payload["email"] is not None:
             payload["email"] = str(payload["email"]).lower()
+        if "password" in payload and payload["password"] is not None:
+            payload["password_hash"] = hash_password(payload.pop("password"))
+        if "role" in payload and payload["role"] is not None:
+            payload["role"] = payload["role"].value
 
         if not payload:
             return await self.get_user(user_id)

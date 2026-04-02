@@ -22,7 +22,7 @@ def user_document_to_response(doc: dict) -> UserResponse:
     """
     Map a `users` collection document to `UserResponse`.
 
-    Expects keys: _id, full_name, email, phone, address, created_at, updated_at.
+    Expects keys: _id, full_name, email, role, phone, address, created_at, updated_at.
     """
     oid = doc.get("_id")
     if isinstance(oid, ObjectId):
@@ -34,6 +34,7 @@ def user_document_to_response(doc: dict) -> UserResponse:
         id=id_str,
         full_name=str(doc["full_name"]),
         email=str(doc["email"]),
+        role=str(doc.get("role", "customer")),
         phone=str(doc.get("phone", "") or ""),
         address=str(doc.get("address", "") or ""),
         created_at=_ensure_utc_aware(doc["created_at"]),

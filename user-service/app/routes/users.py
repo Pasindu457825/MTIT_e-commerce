@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.dependencies.auth import require_admin
 from app.core.database import get_database
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.services.user_service import UserService
@@ -30,6 +31,7 @@ def get_user_service(db: AsyncIOMotorDatabase = Depends(get_database)) -> UserSe
 )
 async def create_user(
     body: UserCreate,
+    _admin: UserResponse = Depends(require_admin),
     svc: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Create a user; rejects duplicate emails with HTTP 409."""
@@ -42,6 +44,7 @@ async def create_user(
     summary="List users",
 )
 async def list_users(
+    _admin: UserResponse = Depends(require_admin),
     svc: UserService = Depends(get_user_service),
     limit: Annotated[int, Query(ge=1, le=500, description="Max users to return")] = 100,
     search: Annotated[
@@ -64,6 +67,7 @@ async def list_users(
 )
 async def get_user(
     user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
+    _admin: UserResponse = Depends(require_admin),
     svc: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Fetch a single user by id."""
@@ -79,6 +83,7 @@ async def get_user(
 async def update_user(
     user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
     body: UserUpdate,
+    _admin: UserResponse = Depends(require_admin),
     svc: UserService = Depends(get_user_service),
 ) -> UserResponse:
     """Partially update a user (only provided fields are changed)."""
@@ -93,6 +98,7 @@ async def update_user(
 )
 async def delete_user(
     user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
+    _admin: UserResponse = Depends(require_admin),
     svc: UserService = Depends(get_user_service),
 ) -> None:
     """Delete a user by id."""

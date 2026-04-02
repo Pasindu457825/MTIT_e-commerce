@@ -24,7 +24,7 @@ async def register(
 ) -> AuthTokenResponse:
     user = await svc.create_user(body)
     return AuthTokenResponse(
-        access_token=create_access_token(user.id),
+        access_token=create_access_token(subject=user.id, email=str(user.email), role=user.role),
         expires_in=settings.auth_access_token_expire_minutes * 60,
         user=user,
     )
@@ -46,7 +46,7 @@ async def login(
             detail="Invalid email or password.",
         )
     return AuthTokenResponse(
-        access_token=create_access_token(user.id),
+        access_token=create_access_token(subject=user.id, email=str(user.email), role=user.role),
         expires_in=settings.auth_access_token_expire_minutes * 60,
         user=user,
     )

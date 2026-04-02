@@ -9,6 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.security import AuthenticatedUser, require_admin
 from app.core.database import get_database
 from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
 from app.services.product_service import ProductService
@@ -30,6 +31,7 @@ def get_product_service(db: AsyncIOMotorDatabase = Depends(get_database)) -> Pro
 )
 async def create_product(
     body: ProductCreate,
+    _admin: AuthenticatedUser = Depends(require_admin),
     svc: ProductService = Depends(get_product_service),
 ) -> ProductResponse:
     """Create a product."""
@@ -79,6 +81,7 @@ async def get_product(
 async def update_product(
     product_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
     body: ProductUpdate,
+    _admin: AuthenticatedUser = Depends(require_admin),
     svc: ProductService = Depends(get_product_service),
 ) -> ProductResponse:
     """Partially update a product (only provided fields are changed)."""
@@ -93,6 +96,7 @@ async def update_product(
 )
 async def delete_product(
     product_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
+    _admin: AuthenticatedUser = Depends(require_admin),
     svc: ProductService = Depends(get_product_service),
 ) -> None:
     """Delete a product by id."""

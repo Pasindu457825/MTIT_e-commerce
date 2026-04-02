@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # --- Collections (fixed name for this service) ---
     products_collection: str = "products"
 
+    # --- Authentication ---
+    auth_secret_key: str = "change-me-in-production"
+
     # --- CORS ---
     # Comma-separated list, e.g. "http://localhost:3000,http://127.0.0.1:3000"
     # Use "*" to allow any origin (fine for local dev; avoid in production with credentials).

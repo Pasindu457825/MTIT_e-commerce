@@ -5,6 +5,7 @@ Timestamps in responses are timezone-aware UTC datetimes (ISO-8601 in JSON).
 """
 
 from datetime import datetime
+from enum import StrEnum
 from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -12,6 +13,11 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 def _normalize_email(v: str) -> str:
     return v.strip().lower()
+
+
+class UserRole(StrEnum):
+    CUSTOMER = "customer"
+    ADMIN = "admin"
 
 
 class UserCreate(BaseModel):
@@ -40,8 +46,10 @@ class UserUpdate(BaseModel):
 
     full_name: Annotated[str | None, Field(default=None, min_length=1, max_length=200)] = None
     email: EmailStr | None = None
+    password: Annotated[str | None, Field(default=None, min_length=8, max_length=128)] = None
     phone: Annotated[str | None, Field(default=None, max_length=40)] = None
     address: Annotated[str | None, Field(default=None, max_length=500)] = None
+    role: UserRole | None = None
 
     @field_validator("email", mode="before")
     @classmethod
@@ -61,6 +69,7 @@ class UserResponse(BaseModel):
     id: str
     full_name: str
     email: EmailStr
+    role: UserRole
     phone: str
     address: str
     created_at: datetime

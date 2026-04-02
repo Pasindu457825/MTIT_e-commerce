@@ -3,9 +3,10 @@
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
+from app.dependencies.auth import get_current_user, require_admin
 from app.main import app
 from app.routes.users import get_user_service
-from app.schemas.user import UserResponse
+from app.schemas.user import UserResponse, UserRole
 
 
 def _now() -> datetime:
@@ -18,6 +19,7 @@ class DummyUserService:
             id="507f1f77bcf86cd799439011",
             full_name=body.full_name,
             email=body.email,
+            role=UserRole.CUSTOMER,
             phone=body.phone,
             address=body.address,
             created_at=_now(),
@@ -29,6 +31,7 @@ class DummyUserService:
             id="507f1f77bcf86cd799439011",
             full_name="Alice",
             email="alice@example.com",
+            role=UserRole.CUSTOMER,
             phone="0771234567",
             address="Colombo",
             created_at=_now(),
@@ -47,6 +50,7 @@ class DummyUserService:
                     id="507f1f77bcf86cd799439012",
                     full_name="Bob",
                     email="bob@example.com",
+                    role=UserRole.CUSTOMER,
                     phone="0710000000",
                     address="Kandy",
                     created_at=_now(),
@@ -58,12 +62,26 @@ class DummyUserService:
                 id="507f1f77bcf86cd799439011",
                 full_name="Alice",
                 email="alice@example.com",
+                role=UserRole.CUSTOMER,
                 phone="0771234567",
                 address="Colombo",
                 created_at=_now(),
                 updated_at=_now(),
             )
         ]
+
+
+def _admin_user() -> UserResponse:
+    return UserResponse(
+        id="507f1f77bcf86cd799439099",
+        full_name="Admin",
+        email="admin@example.com",
+        role=UserRole.ADMIN,
+        phone="",
+        address="",
+        created_at=_now(),
+        updated_at=_now(),
+    )
 
 
 def test_health_endpoint() -> None:
@@ -75,6 +93,7 @@ def test_health_endpoint() -> None:
 
 def test_create_and_get_user() -> None:
     app.dependency_overrides[get_user_service] = lambda: DummyUserService()
+    app.dependency_overrides[require_admin] = lambda: _admin_user()
     try:
         with TestClient(app) as client:
             create = client.post(
@@ -97,6 +116,7 @@ def test_create_and_get_user() -> None:
 
 
 def test_invalid_input_user_create() -> None:
+    app.dependency_overrides[require_admin] = lambda: _admin_user()
     with TestClient(app) as client:
         res = client.post(
             "/api/v1/users",
@@ -109,12 +129,15 @@ def test_invalid_input_user_create() -> None:
             },
         )
     assert res.status_code == 422
+    app.dependency_overrides.clear()
 
 
 def test_invalid_objectid_user() -> None:
+    app.dependency_overrides[require_admin] = lambda: _admin_user()
     with TestClient(app) as client:
         res = client.get("/api/v1/users/not-an-objectid")
     assert res.status_code == 400
+    app.dependency_overrides.clear()
 
 
 def test_not_found_user() -> None:
@@ -123,6 +146,7 @@ def test_not_found_user() -> None:
             raise HTTPException(status_code=404, detail="User not found.")
 
     app.dependency_overrides[get_user_service] = lambda: NotFoundUserService()
+    app.dependency_overrides[require_admin] = lambda: _admin_user()
     try:
         with TestClient(app) as client:
             res = client.get("/api/v1/users/507f1f77bcf86cd799439011")
@@ -133,6 +157,7 @@ def test_not_found_user() -> None:
 
 def test_list_users_with_search() -> None:
     app.dependency_overrides[get_user_service] = lambda: DummyUserService()
+    app.dependency_overrides[require_admin] = lambda: _admin_user()
     try:
         with TestClient(app) as client:
             res = client.get("/api/v1/users?search=bob&limit=10")
@@ -146,6 +171,10 @@ def test_list_users_with_search() -> None:
 
 def test_auth_register_login_and_me() -> None:
     app.dependency_overrides[get_user_service] = lambda: DummyUserService()
+    async def _current_user_override():
+        return await DummyUserService().get_user(None)
+
+    app.dependency_overrides[get_current_user] = _current_user_override
     try:
         with TestClient(app) as client:
             register = client.post(
@@ -181,3 +210,9 @@ def test_auth_register_login_and_me() -> None:
         assert bad_login.status_code == 401
     finally:
         app.dependency_overrides.clear()
+
+
+def test_users_require_admin() -> None:
+    with TestClient(app) as client:
+        res = client.get("/api/v1/users")
+    assert res.status_code == 401

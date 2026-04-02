@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from app.core.config import settings
+from app.schemas.user import UserRole
 
 
 def _b64url_encode(data: bytes) -> str:
@@ -61,14 +62,16 @@ def verify_password(password: str, password_hash: str) -> bool:
     return hmac.compare_digest(actual, expected)
 
 
-def create_access_token(subject: str) -> str:
-    """Create a signed HS256 token with `sub`, `iat`, and `exp` claims."""
+def create_access_token(*, subject: str, email: str, role: UserRole) -> str:
+    """Create a signed HS256 token with identity and role claims."""
     now = datetime.now(UTC)
     exp = now + timedelta(minutes=settings.auth_access_token_expire_minutes)
 
     header = {"alg": "HS256", "typ": "JWT"}
     payload = {
         "sub": subject,
+        "email": email,
+        "role": role.value,
         "iat": int(now.timestamp()),
         "exp": int(exp.timestamp()),
     }
@@ -124,5 +127,7 @@ def decode_access_token(token: str) -> dict[str, Any]:
         raise ValueError("Token missing expiration.")
     if int(time.time()) >= exp:
         raise ValueError("Token expired.")
+    if not payload.get("sub") or not payload.get("email") or not payload.get("role"):
+        raise ValueError("Token missing required claims.")
 
     return payload
