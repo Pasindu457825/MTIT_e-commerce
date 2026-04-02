@@ -21,6 +21,7 @@ class UserCreate(BaseModel):
 
     full_name: Annotated[str, Field(min_length=1, max_length=200)]
     email: EmailStr
+    password: Annotated[str, Field(min_length=8, max_length=128)]
     phone: Annotated[str, Field(default="", max_length=40)]
     address: Annotated[str, Field(default="", max_length=500)]
 
@@ -64,3 +65,28 @@ class UserResponse(BaseModel):
     address: str
     created_at: datetime
     updated_at: datetime
+
+
+class LoginRequest(BaseModel):
+    """Payload for authenticating an existing user."""
+
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    email: EmailStr
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email_login(cls, v: str) -> str:
+        if isinstance(v, str):
+            return _normalize_email(v)
+        return v
+
+
+class AuthTokenResponse(BaseModel):
+    """Bearer token response for authenticated clients."""
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserResponse

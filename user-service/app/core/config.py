@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     # Use "*" to allow any origin (fine for local dev; avoid in production with credentials).
     cors_origins: str = "*"
 
+    # --- Authentication ---
+    # Replace in production with a long random value.
+    auth_secret_key: str = "change-me-in-production"
+    auth_access_token_expire_minutes: int = 60
+    password_hash_iterations: int = 210_000
+
     @property
     def cors_origin_list(self) -> list[str]:
         """Parse `cors_origins` into a list for Starlette's CORSMiddleware."""
@@ -54,6 +60,26 @@ class Settings(BaseSettings):
     def db_name_not_empty(cls, v: str) -> str:
         if not v or not v.strip():
             raise ValueError("DATABASE_NAME must be non-empty")
+        return v.strip()
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug(cls, v):
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            value = v.strip().lower()
+            if value in {"1", "true", "yes", "on", "debug", "dev"}:
+                return True
+            if value in {"0", "false", "no", "off", "release", "prod", "production", ""}:
+                return False
+        return v
+
+    @field_validator("auth_secret_key")
+    @classmethod
+    def auth_secret_not_empty(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("AUTH_SECRET_KEY must be non-empty")
         return v.strip()
 
 

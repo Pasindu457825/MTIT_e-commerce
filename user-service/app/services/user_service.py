@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
 from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from app.core.config import settings
+from app.core.security import hash_password, verify_password
 from app.schemas.user import UserCreate, UserUpdate, UserResponse
 from app.utils.serialization import user_document_to_response, user_documents_to_responses
 
@@ -30,6 +31,7 @@ class UserService:
         doc = {
             "full_name": data.full_name,
             "email": email_norm,
+            "password_hash": hash_password(data.password),
             "phone": data.phone,
             "address": data.address,
             "created_at": now,
@@ -82,6 +84,25 @@ class UserService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found.",
             )
+        return user_document_to_response(doc)
+
+    async def authenticate_user(self, email: str, password: str) -> UserResponse | None:
+        """Return user when email/password are valid; otherwise `None`."""
+        try:
+            doc = await self._col.find_one({"email": email.strip().lower()})
+        except PyMongoError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not authenticate user - database error.",
+            ) from exc
+
+        if not doc:
+            return None
+
+        password_hash = str(doc.get("password_hash", ""))
+        if not password_hash or not verify_password(password, password_hash):
+            return None
+
         return user_document_to_response(doc)
 
     async def update_user(self, user_id: ObjectId, data: UserUpdate) -> UserResponse:
