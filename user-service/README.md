@@ -37,6 +37,7 @@ Docs: `http://localhost:8001/docs`
 | POST | `/api/v1/auth/register` | Register user (`role`: `user` or `admin`) and return bearer token |
 | POST | `/api/v1/auth/login` | Login with email/password and return bearer token |
 | GET | `/api/v1/auth/me` | Get current user from bearer token |
+| GET | `/api/v1/users/me` | Get my profile (logged-in user) |
 | POST | `/api/v1/users` | Create user (requires `password` in payload) |
 | GET | `/api/v1/users` | List users (`limit`) with optional `search` |
 | GET | `/api/v1/users/{user_id}` | Get by MongoDB ObjectId |
