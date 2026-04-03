@@ -1,4 +1,4 @@
-﻿from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -8,7 +8,7 @@ from app.routes.cart import get_cart_service
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 class DummyCartService:
@@ -77,3 +77,4 @@ def test_not_found_cart_item_remove() -> None:
         assert res.status_code == 404
     finally:
         app.dependency_overrides.clear()
+
