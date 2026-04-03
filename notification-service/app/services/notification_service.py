@@ -12,6 +12,7 @@ from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
 from pymongo.errors import PyMongoError
 
 from app.core.config import settings
+from app.core.security import AuthenticatedUser, assert_owns_user_id
 from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
 from app.utils.serialization import notification_document_to_response, notification_documents_to_responses
 
@@ -82,8 +83,13 @@ class NotificationService:
             ) from exc
         return notification_documents_to_responses(docs)
 
-    async def get_notification(self, notification_id: ObjectId) -> NotificationResponse:
-        """Fetch one notification by `_id` or 404."""
+    async def get_notification(
+        self,
+        notification_id: ObjectId,
+        *,
+        current_user: AuthenticatedUser | None = None,
+    ) -> NotificationResponse:
+        """Fetch one notification by `_id` or 404. Enforces ownership for non-admin users."""
         try:
             doc = await self._col.find_one({"_id": notification_id})
         except PyMongoError as exc:
@@ -96,6 +102,8 @@ class NotificationService:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Notification not found.",
             )
+        if current_user is not None:
+            assert_owns_user_id(current_user, str(doc.get("user_id", "")))
         return notification_document_to_response(doc)
 
     async def update_notification(
@@ -131,8 +139,16 @@ class NotificationService:
             )
         return notification_document_to_response(updated)
 
-    async def mark_as_read(self, notification_id: ObjectId) -> NotificationResponse:
-        """Mark a notification as read; 404 if not found."""
+    async def mark_as_read(
+        self,
+        notification_id: ObjectId,
+        *,
+        current_user: AuthenticatedUser | None = None,
+    ) -> NotificationResponse:
+        """Mark a notification as read; 404 if not found. Enforces ownership for non-admin users."""
+        existing = await self.get_notification(notification_id, current_user=current_user)
+        if existing.is_read:
+            return existing
         now = datetime.now(UTC)
         try:
             result = await self._col.update_one(
@@ -174,8 +190,14 @@ class NotificationService:
             ) from exc
         return {"modified_count": result.modified_count}
 
-    async def delete_notification(self, notification_id: ObjectId) -> None:
-        """Delete a notification by id; 404 if not found."""
+    async def delete_notification(
+        self,
+        notification_id: ObjectId,
+        *,
+        current_user: AuthenticatedUser | None = None,
+    ) -> None:
+        """Delete a notification by id; 404 if not found. Enforces ownership for non-admin users."""
+        await self.get_notification(notification_id, current_user=current_user)
         try:
             result = await self._col.delete_one({"_id": notification_id})
         except PyMongoError as exc:

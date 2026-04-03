@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Path, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.core.database import get_database
+from app.core.security import AuthenticatedUser, assert_owns_user_id, get_current_user, require_admin
 from app.schemas.notification import NotificationCreate, NotificationUpdate, NotificationResponse
 from app.services.notification_service import NotificationService
 from app.utils.objectid import parse_object_id
@@ -37,6 +38,7 @@ def get_notification_service(
 )
 async def create_notification(
     body: NotificationCreate,
+    _admin: AuthenticatedUser = Depends(require_admin),
     svc: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Create a new notification for a user."""
@@ -49,6 +51,7 @@ async def create_notification(
     summary="List notifications",
 )
 async def list_notifications(
+    _admin: AuthenticatedUser = Depends(require_admin),
     svc: NotificationService = Depends(get_notification_service),
     limit: Annotated[int, Query(ge=1, le=500, description="Max notifications to return")] = 100,
     user_id: str | None = Query(default=None, description="Filter by external user id"),
@@ -65,12 +68,14 @@ async def list_notifications(
 )
 async def list_notifications_for_user(
     user_id: Annotated[str, Path(description="External user id (string reference)")],
+    current_user: AuthenticatedUser = Depends(get_current_user),
     svc: NotificationService = Depends(get_notification_service),
     limit: Annotated[int, Query(ge=1, le=500, description="Max notifications to return")] = 100,
     is_read: bool | None = Query(default=None, description="Filter by read status"),
 ) -> list[NotificationResponse]:
     """Return notifications for one user (newest first), optionally filtered by `is_read`."""
     uid = require_reference_id(user_id, field_name="user_id")
+    assert_owns_user_id(current_user, uid)
     return await svc.list_notifications(limit=limit, user_id=uid, is_read=is_read)
 
 
@@ -81,11 +86,12 @@ async def list_notifications_for_user(
 )
 async def get_notification(
     notification_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
+    current_user: AuthenticatedUser = Depends(get_current_user),
     svc: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Fetch a single notification by id."""
     oid = parse_object_id(notification_id)
-    return await svc.get_notification(oid)
+    return await svc.get_notification(oid, current_user=current_user)
 
 
 @router.put(
@@ -96,6 +102,7 @@ async def get_notification(
 async def update_notification(
     notification_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
     body: NotificationUpdate,
+    _admin: AuthenticatedUser = Depends(require_admin),
     svc: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Partially update a notification (title and/or message)."""
@@ -110,11 +117,12 @@ async def update_notification(
 )
 async def mark_notification_read(
     notification_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
+    current_user: AuthenticatedUser = Depends(get_current_user),
     svc: NotificationService = Depends(get_notification_service),
 ) -> NotificationResponse:
     """Mark a single notification as read."""
     oid = parse_object_id(notification_id)
-    return await svc.mark_as_read(oid)
+    return await svc.mark_as_read(oid, current_user=current_user)
 
 
 @router.patch(
@@ -124,10 +132,12 @@ async def mark_notification_read(
 )
 async def mark_all_notifications_read(
     user_id: Annotated[str, Path(description="External user id (string reference)")],
+    current_user: AuthenticatedUser = Depends(get_current_user),
     svc: NotificationService = Depends(get_notification_service),
 ) -> dict:
     """Mark all unread notifications for a user as read."""
     uid = require_reference_id(user_id, field_name="user_id")
+    assert_owns_user_id(current_user, uid)
     return await svc.mark_all_read_for_user(uid)
 
 
@@ -138,8 +148,9 @@ async def mark_all_notifications_read(
 )
 async def delete_notification(
     notification_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
+    current_user: AuthenticatedUser = Depends(get_current_user),
     svc: NotificationService = Depends(get_notification_service),
 ) -> None:
-    """Delete a notification by id."""
+    """Delete a notification by id. Admins can delete any; customers only their own."""
     oid = parse_object_id(notification_id)
-    await svc.delete_notification(oid)
+    await svc.delete_notification(oid, current_user=current_user)
