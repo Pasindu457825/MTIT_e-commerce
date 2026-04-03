@@ -6,7 +6,7 @@ Cart documents use a Mongo `ObjectId` for `_id`, but `user_id` / `product_id` st
 `total_amount` in the response is derived from merged line items so it always matches the listed rows.
 """
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from bson import ObjectId
 
@@ -15,10 +15,10 @@ from app.utils.cart_items import compute_cart_total, merge_duplicate_lines, norm
 
 
 def _ensure_utc_aware(dt: datetime) -> datetime:
-    """BSON datetimes are often naive UTC; make them explicitly UTC-aware for JSON."""
+    """BSON datetimes are often naive timezone.utc; make them explicitly timezone.utc-aware for JSON."""
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC)
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _raw_items_to_rows(raw_items: object) -> list[dict]:
@@ -72,3 +72,4 @@ def cart_document_to_response(doc: dict) -> CartResponse:
         created_at=_ensure_utc_aware(doc["created_at"]),
         updated_at=_ensure_utc_aware(doc["updated_at"]),
     )
+

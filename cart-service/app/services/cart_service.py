@@ -5,7 +5,7 @@ Routes stay thin: validate path/body → call this service → return `CartRespo
 """
 
 from copy import deepcopy
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, status
 from motor.motor_asyncio import AsyncIOMotorCollection, AsyncIOMotorDatabase
@@ -67,7 +67,7 @@ class CartService:
         if doc is not None:
             return doc
 
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         new_doc = {
             "user_id": user_id,
             "items": [],
@@ -110,7 +110,7 @@ class CartService:
         raw = doc.get("items") or []
         cleaned = merge_duplicate_lines(deepcopy(raw))
         if len(cleaned) != len(raw):
-            return await self._persist_cart(doc["_id"], cleaned, now=datetime.now(UTC))
+            return await self._persist_cart(doc["_id"], cleaned, now=datetime.now(timezone.utc))
         return cart_document_to_response(doc)
 
     async def add_item(self, user_id: str, body: CartItemAdd) -> CartResponse:
@@ -121,7 +121,7 @@ class CartService:
         the **last** appended row for that product (this request’s price).
         """
         cart = await self.get_or_create_cart(user_id)
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         items: list[dict] = deepcopy(cart.get("items") or [])
 
         pid = normalize_product_id(body.product_id)
@@ -143,7 +143,7 @@ class CartService:
     ) -> CartResponse:
         """Set quantity for one product line; 404 if that product is not in the cart."""
         cart = await self.get_or_create_cart(user_id)
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         items: list[dict] = merge_duplicate_lines(deepcopy(cart.get("items") or []))
 
         updated = False
@@ -164,7 +164,7 @@ class CartService:
     async def remove_item(self, user_id: str, product_id: str) -> CartResponse:
         """Remove one product line; 404 if that product is not present."""
         cart = await self.get_or_create_cart(user_id)
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         items: list[dict] = merge_duplicate_lines(deepcopy(cart.get("items") or []))
 
         new_items = [r for r in items if not line_matches_product(r, product_id)]
@@ -179,5 +179,6 @@ class CartService:
     async def clear_cart(self, user_id: str) -> CartResponse:
         """Remove all line items and reset `total_amount` to 0."""
         cart = await self.get_or_create_cart(user_id)
-        now = datetime.now(UTC)
+        now = datetime.now(timezone.utc)
         return await self._persist_cart(cart["_id"], [], now=now)
+
