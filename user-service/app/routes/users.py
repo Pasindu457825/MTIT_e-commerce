@@ -6,12 +6,12 @@ Business rules and DB calls live in `app.services.user_service`.
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from app.dependencies.auth import require_admin
+from app.dependencies.auth import get_current_user, require_admin
 from app.core.database import get_database
-from app.schemas.user import UserCreate, UserUpdate, UserResponse
+from app.schemas.user import UserCreate, UserRole, UserUpdate, UserResponse
 from app.services.user_service import UserService
 from app.utils.objectid import parse_object_id
 
@@ -61,16 +61,33 @@ async def list_users(
 
 
 @router.get(
+    "/me",
+    response_model=UserResponse,
+    summary="Get my profile",
+)
+async def get_my_profile(
+    current_user: UserResponse = Depends(get_current_user),
+) -> UserResponse:
+    """Return currently authenticated user profile."""
+    return current_user
+
+
+@router.get(
     "/{user_id}",
     response_model=UserResponse,
     summary="Get user by id",
 )
 async def get_user(
     user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
-    _admin: UserResponse = Depends(require_admin),
+    current_user: UserResponse = Depends(get_current_user),
     svc: UserService = Depends(get_user_service),
 ) -> UserResponse:
-    """Fetch a single user by id."""
+    """Fetch a single user by id (admin or owner)."""
+    if current_user.role != UserRole.ADMIN and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only access your own user profile.",
+        )
     oid = parse_object_id(user_id)
     return await svc.get_user(oid)
 
@@ -83,10 +100,20 @@ async def get_user(
 async def update_user(
     user_id: Annotated[str, Path(description="MongoDB ObjectId as hex string")],
     body: UserUpdate,
-    _admin: UserResponse = Depends(require_admin),
+    current_user: UserResponse = Depends(get_current_user),
     svc: UserService = Depends(get_user_service),
 ) -> UserResponse:
-    """Partially update a user (only provided fields are changed)."""
+    """Partially update a user (admin or owner)."""
+    is_admin = current_user.role == UserRole.ADMIN
+    if not is_admin and current_user.id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only update your own user profile.",
+        )
+    if not is_admin and body.role is not None:
+        # UX-friendly behavior: ignore role input for non-admin users
+        # (Swagger often sends fields users didn't intend to change).
+        body = body.model_copy(update={"role": None})
     oid = parse_object_id(user_id)
     return await svc.update_user(oid, body)
 

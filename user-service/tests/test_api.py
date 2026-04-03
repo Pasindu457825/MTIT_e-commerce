@@ -70,6 +70,20 @@ class DummyUserService:
             )
         ]
 
+    async def update_user(self, _user_id, data):
+        base = await self.get_user(None)
+        payload = data.model_dump(exclude_unset=True, exclude_none=True)
+        return UserResponse(
+            id=base.id,
+            full_name=payload.get("full_name", base.full_name),
+            email=payload.get("email", base.email),
+            role=base.role,
+            phone=payload.get("phone", base.phone),
+            address=payload.get("address", base.address),
+            created_at=base.created_at,
+            updated_at=_now(),
+        )
+
 
 def _admin_user() -> UserResponse:
     return UserResponse(
@@ -94,6 +108,7 @@ def test_health_endpoint() -> None:
 def test_create_and_get_user() -> None:
     app.dependency_overrides[get_user_service] = lambda: DummyUserService()
     app.dependency_overrides[require_admin] = lambda: _admin_user()
+    app.dependency_overrides[get_current_user] = lambda: _admin_user()
     try:
         with TestClient(app) as client:
             create = client.post(
@@ -133,7 +148,7 @@ def test_invalid_input_user_create() -> None:
 
 
 def test_invalid_objectid_user() -> None:
-    app.dependency_overrides[require_admin] = lambda: _admin_user()
+    app.dependency_overrides[get_current_user] = lambda: _admin_user()
     with TestClient(app) as client:
         res = client.get("/api/v1/users/not-an-objectid")
     assert res.status_code == 400
@@ -146,7 +161,7 @@ def test_not_found_user() -> None:
             raise HTTPException(status_code=404, detail="User not found.")
 
     app.dependency_overrides[get_user_service] = lambda: NotFoundUserService()
-    app.dependency_overrides[require_admin] = lambda: _admin_user()
+    app.dependency_overrides[get_current_user] = lambda: _admin_user()
     try:
         with TestClient(app) as client:
             res = client.get("/api/v1/users/507f1f77bcf86cd799439011")
@@ -248,5 +263,43 @@ def test_register_allows_admin_role_selection() -> None:
             )
         assert register.status_code == 201
         assert register.json()["user"]["role"] == "admin"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_users_me_for_logged_in_user() -> None:
+    async def _current_user_override():
+        return await DummyUserService().get_user(None)
+
+    app.dependency_overrides[get_current_user] = _current_user_override
+    try:
+        with TestClient(app) as client:
+            res = client.get("/api/v1/users/me")
+        assert res.status_code == 200
+        assert res.json()["email"] == "alice@example.com"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_user_can_update_own_profile_but_cannot_change_role() -> None:
+    async def _current_user_override():
+        return await DummyUserService().get_user(None)
+
+    app.dependency_overrides[get_current_user] = _current_user_override
+    app.dependency_overrides[get_user_service] = lambda: DummyUserService()
+    try:
+        with TestClient(app) as client:
+            ok = client.put(
+                "/api/v1/users/507f1f77bcf86cd799439011",
+                json={"full_name": "Alice Updated"},
+            )
+            forbidden = client.put(
+                "/api/v1/users/507f1f77bcf86cd799439011",
+                json={"role": "admin"},
+            )
+        assert ok.status_code == 200
+        assert ok.json()["full_name"] == "Alice Updated"
+        assert forbidden.status_code == 200
+        assert forbidden.json()["role"] == "user"
     finally:
         app.dependency_overrides.clear()
