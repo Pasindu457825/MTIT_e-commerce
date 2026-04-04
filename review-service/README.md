@@ -16,6 +16,7 @@ FastAPI + Motor microservice for product reviews.
 ```bash
 cd review-service
 python -m venv .venv
+. .venv/bin/activate    # macOS/Linux
 .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 copy .env.example .env
