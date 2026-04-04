@@ -10,6 +10,7 @@ FastAPI + Motor microservice for product reviews.
 
 - Python 3.11+
 - MongoDB reachable via `MONGODB_URL`
+- Product service reachable via `PRODUCT_SERVICE_URL` (only if validation is enabled)
 
 ## Setup
 
@@ -20,6 +21,14 @@ python -m venv .venv
 .venv\Scripts\activate   # Windows
 pip install -r requirements.txt
 copy .env.example .env
+```
+
+Optional product validation settings (in `.env`):
+
+```env
+VALIDATE_PRODUCT_ON_CREATE=false
+PRODUCT_SERVICE_URL=http://127.0.0.1:8002
+PRODUCT_SERVICE_TIMEOUT_SECONDS=2.0
 ```
 
 ## Run
@@ -45,6 +54,7 @@ Docs: `http://localhost:8006/docs`
 ## Conventions
 
 - `review_id` is MongoDB ObjectId; `product_id` and `user_id` are external references
+- Optional product existence validation on review creation via product-service
 - UTC timestamps: `created_at`, `updated_at`
 - ObjectId in responses serialized as string `id`
 - MongoDB checked on startup (lifespan ping)

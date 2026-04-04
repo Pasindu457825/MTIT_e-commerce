@@ -10,8 +10,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Path, Query, status
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
+from app.core.config import settings
 from app.core.database import get_database
 from app.schemas.review import ReviewCreate, ReviewUpdate, ReviewResponse
+from app.services.product_catalog_client import ProductCatalogClient
 from app.services.review_service import ReviewService
 from app.utils.objectid import parse_object_id
 from app.utils.path_params import require_reference_id
@@ -27,6 +29,15 @@ def get_review_service(db: AsyncIOMotorDatabase = Depends(get_database)) -> Revi
     return ReviewService(db)
 
 
+def get_product_catalog_client() -> ProductCatalogClient:
+    """Inject product-service client used for optional product validation."""
+    return ProductCatalogClient(
+        base_url=settings.product_service_url,
+        timeout_seconds=settings.product_service_timeout_seconds,
+        enabled=settings.validate_product_on_create,
+    )
+
+
 @router.post(
     "",
     response_model=ReviewResponse,
@@ -36,8 +47,10 @@ def get_review_service(db: AsyncIOMotorDatabase = Depends(get_database)) -> Revi
 async def create_review(
     body: ReviewCreate,
     svc: ReviewService = Depends(get_review_service),
+    product_catalog: ProductCatalogClient = Depends(get_product_catalog_client),
 ) -> ReviewResponse:
     """Create a review (one per user per product — unique index)."""
+    await product_catalog.assert_product_exists(body.product_id)
     return await svc.create_review(body)
 
 

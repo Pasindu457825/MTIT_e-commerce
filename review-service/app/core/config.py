@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     debug: bool = False
     api_version: str = "v1"
 
+    # --- Downstream integration (product-service validation) ---
+    validate_product_on_create: bool = False
+    product_service_url: str = "http://127.0.0.1:8002"
+    product_service_timeout_seconds: float = 2.0
+
     # --- MongoDB (Motor; MONGODB_URL and DATABASE_NAME in `.env`) ---
     mongodb_url: str = "mongodb://localhost:27017"
     database_name: str = "review_db"
@@ -55,6 +60,13 @@ class Settings(BaseSettings):
         if not v or not v.strip():
             raise ValueError("DATABASE_NAME must be non-empty")
         return v.strip()
+
+    @field_validator("product_service_timeout_seconds")
+    @classmethod
+    def product_timeout_positive(cls, v: float) -> float:
+        if v <= 0:
+            raise ValueError("PRODUCT_SERVICE_TIMEOUT_SECONDS must be > 0")
+        return v
 
 
 settings = Settings()
