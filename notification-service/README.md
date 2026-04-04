@@ -57,9 +57,23 @@ Docs: `http://localhost:8007/docs`
 | `review_posted` | A review was posted |
 | `general` | General purpose notification |
 
+## Create Request Example
+
+```json
+{
+  "user_id": "user-001",
+  "notification_type": "order_placed",
+  "title": "Order Placed",
+  "message": "Your order #123 has been placed successfully."
+}
+```
+
+> Use `notification_type` (not `type`) when creating a notification.
+
 ## Conventions
 
 - `notification_id` is MongoDB ObjectId; `user_id` is an external reference (plain string)
+- `notification_type` field name used in both request body and response (replaces generic `type`)
 - UTC timestamps: `created_at`, `updated_at`
 - `is_read` defaults to `false` on creation
 - ObjectId in responses serialized as string `id`

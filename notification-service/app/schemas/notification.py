@@ -30,7 +30,7 @@ class NotificationCreate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     user_id: Annotated[str, Field(min_length=1, max_length=200)]
-    type: NotificationType = "general"
+    notification_type: NotificationType = "general"
     title: Annotated[str, Field(min_length=1, max_length=500)]
     message: Annotated[str, Field(min_length=1, max_length=10_000)]
 
@@ -51,7 +51,7 @@ class NotificationResponse(BaseModel):
 
     id: str
     user_id: str
-    type: str
+    notification_type: str
     title: str
     message: str
     is_read: bool

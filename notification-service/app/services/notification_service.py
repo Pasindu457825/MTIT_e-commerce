@@ -28,7 +28,7 @@ class NotificationService:
         now = datetime.now(UTC)
         doc = {
             "user_id": data.user_id.strip(),
-            "type": data.type,
+            "notification_type": data.notification_type,
             "title": data.title.strip(),
             "message": data.message.strip(),
             "is_read": False,

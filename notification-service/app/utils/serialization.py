@@ -33,7 +33,7 @@ def notification_document_to_response(doc: dict) -> NotificationResponse:
     return NotificationResponse(
         id=id_str,
         user_id=str(doc["user_id"]),
-        type=str(doc["type"]),
+        notification_type=str(doc.get("notification_type", "general")),
         title=str(doc["title"]),
         message=str(doc["message"]),
         is_read=bool(doc.get("is_read", False)),
