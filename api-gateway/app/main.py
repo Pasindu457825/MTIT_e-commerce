@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from httpx import AsyncClient, Timeout
 
 from app.core.config import settings
-from app.routes import api, docs_links, health
+from app.routes import api, docs_links, health, openapi
 
 
 @asynccontextmanager
@@ -19,7 +19,15 @@ async def lifespan(app: FastAPI):
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title=settings.app_name, debug=settings.debug, lifespan=lifespan)
+    app = FastAPI(
+        title=settings.app_name,
+        debug=settings.debug,
+        lifespan=lifespan,
+        openapi_url=None,
+        docs_url=None,
+        redoc_url=None,
+    )
+    app.include_router(openapi.router)
     app.include_router(health.router)
     app.include_router(docs_links.router)
     app.include_router(api.router, prefix="/api/v1")

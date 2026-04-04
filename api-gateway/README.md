@@ -1,14 +1,15 @@
 ﻿# API Gateway
 
-Lightweight FastAPI gateway that reverse-proxies calls to six microservices using `httpx`.
+Lightweight FastAPI gateway that reverse-proxies calls to downstream microservices using `httpx`.
 
 ## Features
 
 - One FastAPI gateway service
 - Environment-driven downstream service URLs
-- Reverse proxy for `/api/v1/{users|products|orders|payments|cart|reviews}`
+- Reverse proxy for `/api/v1/{users|products|orders|payments|cart|reviews|notifications}`
 - Gateway health endpoint: `GET /health`
 - Aggregated downstream health: `GET /health/services`
+- Merged Swagger/OpenAPI on the gateway at `GET /docs`
 - Timeout handling (`504`) and upstream connection errors (`502`)
 - Modular code with comments for learning
 - No authentication yet (intentionally)
@@ -35,6 +36,8 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 Docs: `http://localhost:8000/docs`
 
+The gateway Swagger UI merges its own documented routes with the OpenAPI schemas exposed by running downstream services. If one downstream service is offline, the docs still load and omit that service.
+
 ## Proxy Behavior
 
 Gateway routes are mounted under `/api/v1`:
@@ -45,6 +48,7 @@ Gateway routes are mounted under `/api/v1`:
 - `/api/v1/payments...` -> payment-service
 - `/api/v1/cart...` -> cart-service
 - `/api/v1/reviews...` -> review-service
+- `/api/v1/notifications...` -> notification-service
 
 The gateway preserves method, query string, request body, and most headers.
 

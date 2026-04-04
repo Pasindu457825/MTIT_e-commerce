@@ -17,6 +17,35 @@ class FakeHttpClient:
         return httpx.Response(200, request=req, json={"ok": True})
 
     async def get(self, url: str):
+        if url.endswith("/openapi.json"):
+            service_key = {
+                "8001": "users",
+                "8002": "products",
+                "8003": "orders",
+                "8004": "payments",
+                "8005": "cart",
+                "8006": "reviews",
+                "8007": "notifications",
+            }[url.split(":")[-1].split("/")[0]]
+            req = httpx.Request("GET", url)
+            return httpx.Response(
+                200,
+                request=req,
+                json={
+                    "openapi": "3.1.0",
+                    "info": {"title": f"{service_key}-service", "version": "1.0.0"},
+                    "paths": {
+                        f"/api/v1/{service_key}": {
+                            "get": {
+                                "tags": [service_key],
+                                "summary": f"List {service_key}",
+                                "responses": {"200": {"description": "OK"}},
+                            }
+                        }
+                    },
+                    "tags": [{"name": service_key}],
+                },
+            )
         req = httpx.Request("GET", url)
         return httpx.Response(200, request=req, json={"status": "ok"})
 
@@ -32,7 +61,15 @@ def test_gateway_forwards_one_route_per_service_prefix() -> None:
     fake = FakeHttpClient()
     with TestClient(app) as client:
         client.app.state.http_client = fake
-        for key in ["users", "products", "orders", "payments", "cart", "reviews"]:
+        for key in [
+            "users",
+            "products",
+            "orders",
+            "payments",
+            "cart",
+            "reviews",
+            "notifications",
+        ]:
             res = client.get(f"/api/v1/{key}")
             assert res.status_code == 200
 
@@ -43,6 +80,7 @@ def test_gateway_forwards_one_route_per_service_prefix() -> None:
     assert any(u.endswith("/api/v1/payments") for u in called_urls)
     assert any(u.endswith("/api/v1/cart") for u in called_urls)
     assert any(u.endswith("/api/v1/reviews") for u in called_urls)
+    assert any(u.endswith("/api/v1/notifications") for u in called_urls)
 
 
 def test_gateway_query_and_body_forwarding() -> None:
@@ -69,3 +107,21 @@ def test_gateway_timeout_and_unknown_service_errors() -> None:
 
     assert timeout_res.status_code == 504
     assert unknown_res.status_code == 404
+
+
+def test_gateway_openapi_includes_downstream_paths() -> None:
+    fake = FakeHttpClient()
+    with TestClient(app) as client:
+        client.app.state.http_client = fake
+        res = client.get("/openapi.json")
+
+    assert res.status_code == 200
+    payload = res.json()
+    assert "/health" in payload["paths"]
+    assert "/api/v1/users" in payload["paths"]
+    assert "/api/v1/products" in payload["paths"]
+    assert "/api/v1/orders" in payload["paths"]
+    assert "/api/v1/payments" in payload["paths"]
+    assert "/api/v1/cart" in payload["paths"]
+    assert "/api/v1/reviews" in payload["paths"]
+    assert "/api/v1/notifications" in payload["paths"]

@@ -46,3 +46,8 @@ async def docs_cart() -> RedirectResponse:
 @router.get("/docs/reviews", include_in_schema=False)
 async def docs_reviews() -> RedirectResponse:
     return _service_docs_redirect("reviews")
+
+
+@router.get("/docs/notifications", include_in_schema=False)
+async def docs_notifications() -> RedirectResponse:
+    return _service_docs_redirect("notifications")
